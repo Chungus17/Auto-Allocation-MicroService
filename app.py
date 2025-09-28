@@ -26,13 +26,6 @@ def calculate_distance(driver_lat, driver_lng, pickup_lat, pickup_lng):
     return geodesic((driver_lat, driver_lng), (pickup_lat, pickup_lng)).km
 
 
-@app.route("/auto-allocation", methods=["POST"])
-def generate_auto_allocation():
-    data = request.get_json()
-    print(data)
-    return jsonify({"received": data}), 200
-
-
 # Recursive serializer for Firestore types
 def serialize_firestore(obj):
     if isinstance(obj, GeoPoint):
@@ -47,8 +40,7 @@ def serialize_firestore(obj):
         return obj.ToDatetime().isoformat()
     return obj
 
-
-@app.route("/drivers", methods=["GET"])
+@app.route("/auto-allocation", methods=["GET"])
 def get_drivers():
     try:
         # Get pickup coordinates from query parameters
@@ -95,9 +87,7 @@ def get_drivers():
         driver_summaries.sort(key=lambda x: x["distance_km"])
 
         return (
-            jsonify(
-                {"driver_summaries": driver_summaries}
-            ),
+            jsonify({"driver_summaries": driver_summaries}),
             200,
         )
 
