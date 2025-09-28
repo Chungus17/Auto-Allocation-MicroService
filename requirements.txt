@@ -6,3 +6,4 @@ postmarker
 openpyxl
 requests
 gunicorn
+firebase-admin
