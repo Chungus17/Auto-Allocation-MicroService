@@ -96,7 +96,7 @@ def get_drivers():
 
         return (
             jsonify(
-                {"full_drivers": full_drivers, "driver_summaries": driver_summaries}
+                {"driver_summaries": driver_summaries}
             ),
             200,
         )
