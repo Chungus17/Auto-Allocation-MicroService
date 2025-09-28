@@ -39,7 +39,7 @@ def generate_auto_allocation():
 @app.route("/drivers", methods=["GET"])
 def get_drivers():
     try:
-        drivers_ref = db.collection("drivers").order_by("name")
+        drivers_ref = db.collection("drivers")
         docs = drivers_ref.stream()
 
         drivers = [{"id": doc.id, **doc.to_dict()} for doc in docs]
