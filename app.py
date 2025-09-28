@@ -3,26 +3,17 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore
+import json
 
 app = Flask(__name__)
 CORS(app)
 
-# Build credentials dictionary from environment variables
-service_account_info = {
-    "type": "service_account",
-    "project_id": os.getenv("PROJECT_ID"),
-    "private_key_id": os.getenv("PRIVATE_KEY_ID"),
-    "private_key": os.getenv("PRIVATE_KEY"),  # handle line breaks
-    "client_email": os.getenv("CLIENT_EMAIL"),
-    "client_id": os.getenv("CLIENT_ID"),
-    "auth_uri": os.getenv("AUTH_URI"),
-    "token_uri": os.getenv("TOKEN_URI"),
-    "auth_provider_x509_cert_url": os.getenv("AUTH_PROVIDER_X509_CERT_URL"),
-    "client_x509_cert_url": os.getenv("CLIENT_X509_CERT_URL"),
-}
+# Load the JSON string from env and parse it
+firebase_cred_json = os.environ.get("FIREBASE_CREDENTIALS")
+cred_dict = json.loads(firebase_cred_json)
 
-# Initialize Firebase Admin
-cred = credentials.Certificate(service_account_info)
+# Initialize with parsed credentials
+cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 
 # Get Firestore client
