@@ -1,0 +1,8 @@
+Flask
+flask-cors
+pandas
+python-dotenv
+postmarker
+openpyxl
+requests
+gunicorn
