@@ -70,6 +70,8 @@ def get_drivers():
                 "lng"
             )
 
+            print(doc)
+
             if driver_lat is not None and driver_lng is not None:
                 distance_km = calculate_distance(
                     driver_lat, driver_lng, pickup_lat, pickup_lng
