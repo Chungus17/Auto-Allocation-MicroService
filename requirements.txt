@@ -8,4 +8,3 @@ requests
 gunicorn
 firebase-admin
 geopy
-math
