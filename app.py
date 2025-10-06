@@ -80,8 +80,8 @@ def get_drivers():
         # Firestore query: range on lat only
         drivers_ref = (
             db.collection("drivers")
-            .where("location.lat", ">=", box["min_lat"])
-            .where("location.lat", "<=", box["max_lat"])
+            .where("lat", ">=", box["min_lat"])
+            .where("lat", "<=", box["max_lat"])
         )
 
         docs = drivers_ref.stream()
@@ -89,9 +89,8 @@ def get_drivers():
         driver_summaries = []
         for doc in docs:
             data = doc.to_dict()
-            location = data.get("location", {})
-            driver_lat = location.get("lat")
-            driver_lng = location.get("lng")
+            driver_lat = data.get("lat")
+            driver_lng = data.get("lng")
 
             if driver_lat is not None and driver_lng is not None:
                 # Filter longitude manually
