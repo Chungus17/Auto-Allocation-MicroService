@@ -137,10 +137,10 @@ def get_drivers():
         # Query Firestore for drivers in bounding box
         drivers_ref = (
             db.collection("drivers")
-            .where("location.lat", ">=", box["min_lat"])
-            .where("location.lat", "<=", box["max_lat"])
-            .where("location.lng", ">=", box["min_lng"])
-            .where("location.lng", "<=", box["max_lng"])
+            .where("lat", ">=", box["min_lat"])
+            .where("lat", "<=", box["max_lat"])
+            .where("lng", ">=", box["min_lng"])
+            .where("lng", "<=", box["max_lng"])
         )
 
         docs = drivers_ref.stream()
