@@ -126,7 +126,7 @@ def get_drivers():
     try:
         pickup_lat = request.args.get("pickup_lat", type=float)
         pickup_lng = request.args.get("pickup_lng", type=float)
-        radius_km = request.args.get("radius")
+        radius_km = request.args.get("radius", type=int)
 
         if pickup_lat is None or pickup_lng is None:
             return jsonify({"error": "pickup_lat and pickup_lng are required"}), 400
