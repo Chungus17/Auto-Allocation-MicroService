@@ -22,33 +22,31 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 
-def get_bounding_box(lat, lng, radius_km):
-    # Approximate bounding box: 1 degree ≈ 111 km
-    delta = radius_km / 111.0
-    return {
-        "min_lat": lat - delta,
-        "max_lat": lat + delta,
-        "min_lng": lng - delta,
-        "max_lng": lng + delta,
-    }
-
-
-def haversine(lat1, lon1, lat2, lon2):
+def haversine(lat1, lng1, lat2, lng2):
+    # Returns distance in km
     R = 6371  # Earth radius in km
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lambda = math.radians(lng2 - lng1)
+
     a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1))
-        * math.cos(math.radians(lat2))
-        * math.sin(dlon / 2) ** 2
+        math.sin(d_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
     )
-    return R * 2 * math.asin(math.sqrt(a))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 
-def calculate_distance(driver_lat, driver_lng, pickup_lat, pickup_lng):
-    """Returns distance in km between driver and pickup location."""
-    return geodesic((driver_lat, driver_lng), (pickup_lat, pickup_lng)).km
+def get_bounding_box(lat, lng, radius_km):
+    # Approximate bounding box in degrees
+    lat_delta = radius_km / 110.574
+    lng_delta = radius_km / (111.320 * math.cos(math.radians(lat)))
+    return {
+        "min_lat": lat - lat_delta,
+        "max_lat": lat + lat_delta,
+        "min_lng": lng - lng_delta,
+        "max_lng": lng + lng_delta,
+    }
 
 
 # Recursive serializer for Firestore types
@@ -66,81 +64,24 @@ def serialize_firestore(obj):
     return obj
 
 
-# @app.route("/auto-allocation", methods=["GET"])
-# def get_drivers():
-#     try:
-#         # Get pickup coordinates from query parameters
-#         pickup_lat = request.args.get("pickup_lat", type=float)
-#         pickup_lng = request.args.get("pickup_lng", type=float)
-
-#         if pickup_lat is None or pickup_lng is None:
-#             return jsonify({"error": "pickup_lat and pickup_lng are required"}), 400
-
-#         drivers_ref = db.collection("drivers")
-#         docs = drivers_ref.stream()
-
-#         full_drivers = []
-#         driver_summaries = []
-
-#         for doc in docs:
-#             data = doc.to_dict()
-#             clean_data = serialize_firestore(data)
-#             clean_data["id"] = doc.id
-#             full_drivers.append(clean_data)
-
-#             # Extract summary fields
-#             driver_lat = clean_data.get("lat") or clean_data.get("location", {}).get(
-#                 "lat"
-#             )
-#             driver_lng = clean_data.get("lng") or clean_data.get("location", {}).get(
-#                 "lng"
-#             )
-
-#             if driver_lat is not None and driver_lng is not None:
-#                 distance_km = calculate_distance(
-#                     driver_lat, driver_lng, pickup_lat, pickup_lng
-#                 )
-#                 driver_summary = {
-#                     "driver_id": clean_data.get("driver_id") or clean_data.get("id"),
-#                     "name": clean_data.get("name"),
-#                     "lat": driver_lat,
-#                     "lng": driver_lng,
-#                     "distance_km": round(distance_km, 2),
-#                 }
-#                 driver_summaries.append(driver_summary)
-
-#         # Optionally, sort summaries by nearest driver
-#         driver_summaries.sort(key=lambda x: x["distance_km"])
-
-#         return (
-#             jsonify({"driver_summaries": driver_summaries}),
-#             200,
-#         )
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
-
 @app.route("/auto-allocation", methods=["GET"])
 def get_drivers():
     try:
         pickup_lat = request.args.get("pickup_lat", type=float)
         pickup_lng = request.args.get("pickup_lng", type=float)
-        radius_km = request.args.get("radius", type=int)
+        radius_km = request.args.get("radius", default=2, type=float)  # default 2 km
 
         if pickup_lat is None or pickup_lng is None:
             return jsonify({"error": "pickup_lat and pickup_lng are required"}), 400
 
-        # Get bounding box for 2 km radius
+        # Get bounding box
         box = get_bounding_box(pickup_lat, pickup_lng, radius_km)
 
-        # Query Firestore for drivers in bounding box
+        # Firestore query: range on lat only
         drivers_ref = (
             db.collection("drivers")
-            .where("lat", ">=", box["min_lat"])
-            .where("lat", "<=", box["max_lat"])
-            .where("lng", ">=", box["min_lng"])
-            .where("lng", "<=", box["max_lng"])
+            .where("location.lat", ">=", box["min_lat"])
+            .where("location.lat", "<=", box["max_lat"])
         )
 
         docs = drivers_ref.stream()
@@ -148,25 +89,26 @@ def get_drivers():
         driver_summaries = []
         for doc in docs:
             data = doc.to_dict()
-            driver_lat = data.get("location", {}).get("lat")
-            driver_lng = data.get("location", {}).get("lng")
+            location = data.get("location", {})
+            driver_lat = location.get("lat")
+            driver_lng = location.get("lng")
 
             if driver_lat is not None and driver_lng is not None:
-                distance_km = haversine(driver_lat, driver_lng, pickup_lat, pickup_lng)
+                # Filter longitude manually
+                if box["min_lng"] <= driver_lng <= box["max_lng"]:
+                    distance = haversine(driver_lat, driver_lng, pickup_lat, pickup_lng)
+                    if distance <= radius_km:
+                        driver_summaries.append(
+                            {
+                                "driver_id": doc.id,
+                                "name": data.get("name"),
+                                "lat": driver_lat,
+                                "lng": driver_lng,
+                                "distance_km": round(distance, 2),
+                            }
+                        )
 
-                # Only keep drivers within 2 km radius
-                if distance_km <= 2:
-                    driver_summaries.append(
-                        {
-                            "driver_id": data.get("driver_id") or doc.id,
-                            "name": data.get("name"),
-                            "lat": driver_lat,
-                            "lng": driver_lng,
-                            "distance_km": round(distance_km, 2),
-                        }
-                    )
-
-        # Sort by nearest first
+        # Sort by nearest
         driver_summaries.sort(key=lambda x: x["distance_km"])
 
         return jsonify({"driver_summaries": driver_summaries}), 200
